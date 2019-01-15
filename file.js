@@ -1,30 +1,29 @@
 let fs = require('fs')
 
 function readFile(srcPath) {
-    return new Promise(function (resolve, reject) {
-        let context = fs.openSync(srcPath, "r")
-        // console.log(context)
-        if (context) {
-            let buffer = fs.readFileSync(context)
-            let content = String(buffer)
-            resolve(content)
-            fs.closeSync(context)
-        } else {
-            reject("Something went wrong")
-        }
+    return new Promise((resolve, reject) => {
+        fs.readFile(srcPath, (err, data) => {
+            if (err) {
+                reject("Something went Wrong");
+            } else {
+                content = String(data)
+                content = JSON.parse(content)
+                resolve(content)
+            }
+
+        })
     })
 }
 
 function writeFile(srcPath, data, success) {
-    return new Promise(function (resolve, reject) {
-        let context = fs.openSync(srcPath, "w")
-        if (context) {
-            fs.writeFileSync(context, data)
-            resolve(success)
-            fs.closeSync(context)
-        } else {
-            reject("something went wrong")
-        }
+    return new Promise((resolve, reject) => {
+        fs.writeFile(srcPath, data, (err, cont) => {
+            if (err) {
+                reject("Error in Writting  the File")
+            } else {
+                resolve(success)
+            }
+        })
     })
 }
 

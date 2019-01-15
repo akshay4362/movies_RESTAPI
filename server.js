@@ -7,6 +7,12 @@ var {
 } = require("./file")
 app.use(bodyParser.json());
 const joi = require('joi');
+const idSchema = joi.object().keys({
+    id: joi.number()
+})
+const nameSchema = joi.object().keys({
+    name: joi.string().min(3)
+})
 const schema = joi.object().keys({
     id: joi.number(),
     name: joi.string().min(3)
@@ -14,27 +20,34 @@ const schema = joi.object().keys({
 
 app.get('/api/movies', function (req, res) {
     readFile("./data.json")
-        .then(data => data)
-        .then(movies => res.send(movies))
+        .then(movies => {
+            if (movies.length > 0) {
+                res.send(movies)
+            } else {
+                throw new Error("Movies not Found")
+            }
+        })
         .catch(err => {
-            res.status(400).send(err.message);
+            //console.log(err)
+            res.status(404).send(err.message);
         })
 })
 
 app.get('/api/movies/:id', function (req, res) {
-    let ID = parseInt(req.params.id);
+    let movieId = parseInt(req.params.id);
     var result = joi.validate({
-        id: ID
-    }, schema)
+        id: movieId
+    }, idSchema)
     if (result.error === null) {
         readFile("./data.json")
-            .then(data => data)
             .then(movies => {
-                let parsedMovies = JSON.parse(movies)
-                let movieById = parsedMovies.filter(movie => movie.id == ID)
-                // console.log(movieById)
-                value = movieById.length ? movieById : "Id not found"
-                res.send(value)
+                let movieById = movies.filter(movie => movie.id == movieId)
+                if (movieById.length > 0) {
+                    res.send(movieById)
+                } else {
+                    throw new Error("id not found")
+                }
+                // movie = movieById.length ? movieById : "Id not found"
             })
             .catch(err => {
                 res.status(404).send(err.message);
@@ -42,57 +55,50 @@ app.get('/api/movies/:id', function (req, res) {
     } else {
         res.status(400).send("Entered ID is Incorrect")
     }
-
 })
+
 app.post('/api/movies', function (req, res) {
     let movie = req.body.name;
     var result = joi.validate({
         name: movie
-    }, schema)
-    if (result.error){
+    }, nameSchema)
+    if (result.error) {
         res.status(400).send("Enter Valid Name")
     }
     readFile("./data.json")
-        .then(data => data)
         .then(movies => {
-            let parsedMovies = JSON.parse(movies)
-            // console.log(parsedMovies)
-            let id = Math.floor(Math.random() * (parsedMovies.length + 1234))
-            parsedMovies.push({
+            let id = Math.floor(Math.random() * (movies.length + 1234))
+            movies.push({
                 id: String(id),
                 name: movie
             })
-            return JSON.stringify(parsedMovies)
+            return JSON.stringify(movies)
         })
         .then(data => {
-            writeFile("./data.json", data, "data added")
-                .then(data => res.send(data))
-                .catch(err => res.status(400).send(err.message))
+            return writeFile("./data.json", data, "data added")
+            //.catch(err => res.status(404).send(err.message))
         })
+        .then(data => res.send(data))
         .catch(err => {
             res.status(404).send(err.message);
         })
 })
 app.put('/api/movies/:id', function (req, res) {
-    let id = parseInt(req.params.id)
-    // console.log(typeof id)
+    let movieId = parseInt(req.params.id)
     let name = req.body.name;
     var result = joi.validate({
-        id: id,
+        id: movieId,
         name: name
     }, schema)
 
     if (result.error === null) {
         readFile("./data.json")
-            .then(data => data)
             .then(movies => {
-                let parsedMovies = JSON.parse(movies)
-                let idExist = parsedMovies.filter(movie => movie.id == id)
+                let idExist = movies.filter(movie => movie.id == movieId)
                 //   console.log(idExist)
                 if (idExist.length > 0) {
-                    let mappedMovies = parsedMovies.map(movie => {
-                        if (movie.id == id) {
-                            // console.log(typeof movie.id)
+                    let mappedMovies = movies.map(movie => {
+                        if (movie.id == movieId) {
                             return { ...movie,
                                 name: name
                             }
@@ -105,18 +111,16 @@ app.put('/api/movies/:id', function (req, res) {
                 } else {
                     return null
                 }
-
             })
             .then(data => {
                 if (data) {
-                    writeFile("./data.json", data, "movie name updated")
-                        .then(data => res.send(data))
-                        .catch(err => res.status(400).send(err.message))
-
+                    return writeFile("./data.json", data, "movie name updated")
+                    // .catch(err => res.status(400).send(err.message))
                 } else {
                     res.status(404).send("Data with given id not found");
                 }
             })
+            .then(data => res.send(data))
             .catch(err => {
                 res.status(404).send(err.message);
             })
@@ -125,26 +129,32 @@ app.put('/api/movies/:id', function (req, res) {
     }
 })
 app.delete('/api/movies/:id', function (req, res) {
-    let id = req.params.id;
+    let movieId = req.params.id;
     var result = joi.validate({
-        id: id
-    }, schema)
-    if (result.error === null) {
-        readFile("./data.json")
-            .then(data => data)
-            .then(movies => {
-                let parsedMovies = JSON.parse(movies)
-                let filteredMovies = parsedMovies.filter(movie => movie.id != id)
-                // console.log(filteredMovies)
-                return JSON.stringify(filteredMovies)
-            })
-            .then(data => {
-                writeFile("./data.json", data, `movie with id ${id} got deleted`)
-                    .then(data => res.send(data))
-                    .catch(err => res.status(404).send(err.message))
-            })
-    } else {
-        res.status(400).send("Enter Valid Id")
+        id: movieId
+    }, idSchema)
+    if (result.error) {
+        res.status(400).send("Enter Valid id")
     }
+    readFile("./data.json")
+        .then(movies => {
+            let len = movies.length;
+            let filteredMovies = movies.filter(movie => movie.id != movieId)
+            return Promise.resolve({
+                data: filteredMovies,
+                size: len
+            })
+        })
+        .then(data => {
+            console.log(data)
+            if (data.data.length == data.size) {
+                res.send("Id does not exist")
+            } else {
+                writeFile("./data.json", JSON.stringify(data.data), `movie with id ${movieId} got deleted`)
+                    .then(data => res.send(data))
+                    .catch(err => res.send(err))
+            }
+        })
+        .catch(err => res.status(404).send(err.message))
 })
 app.listen(3001, () => console.log("server started "))
